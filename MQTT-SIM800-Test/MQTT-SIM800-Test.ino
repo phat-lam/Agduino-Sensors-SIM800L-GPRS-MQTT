@@ -75,7 +75,7 @@ void GSM_MQTT::OnConnect(void)
                     :Possible values (0,1,2)
                     :Default value 0
   */
-  publish(0, 0, 0, _generateMessageID(), mqttTopic, "{\"aT\":\"123\",\"aRH\":\"12\"}");
+  publish(0, 0, 0, _generateMessageID(), mqttTopic, "Hello there, I am SIM800L");
   /*  void publish(char DUP, char Qos, char RETAIN, unsigned int MessageID, char *Topic, char *Message);
       DUP       :This flag is set when the client or server attempts to re-deliver a PUBLISH message
                 :This applies to messages where the value of QoS is greater than zero (0)
@@ -114,24 +114,20 @@ void GSM_MQTT::OnMessage(char *Topic, int TopicLength, char *Message, int Messag
   mySerial.println(Message);
 }
 GSM_MQTT MQTT(20);
+
 void setup() {
   // put your setup code here, to run once:
   MQTT.begin();
-
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   String json = buildJson();
   int jsonLength = json.length() + 1;
-  //Serial.print(json);
 
   char jsonStr[jsonLength];
   json.toCharArray(jsonStr, jsonLength);
 
-  //Serial.print(strlen(jsonStr));
-
-    if (MQTT.available())
+  if (MQTT.available())
   {
     // Send msg
     MQTT.publish(0, 0, 0, 1, mqttTopic, jsonStr);
@@ -139,13 +135,7 @@ void loop() {
   }
   MQTT.processing();
   
-//  for (int i = 0; i <= jsonLength; i++)
-//  {
-//    Serial.println(jsonStr[i], HEX);
-//  }
-  
   delay(10000);
-
 }
 
 String buildJson() {
