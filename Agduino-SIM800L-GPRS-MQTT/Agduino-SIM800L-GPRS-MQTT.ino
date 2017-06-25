@@ -25,7 +25,7 @@
  * Created 7 June 2017 by AgriConnect.
  */
 /* Comes with IDE */
-#include <SPI.h>
+//#include <SPI.h>
 #include <Wire.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,10 +48,12 @@ const int soilNum = 10;
 int soilmoistureValue;
 const int airValue = 530;
 const int waterValue = 284;
+static char soilmoistureBuff[3];
 /*------------------------------- DS18B20 sensor -----------------------------------*/
 #define ds_io_data 3
 const int ds_index = 0;
 float ds_temp;
+static char dstempBuff[3];
 OneWire oneWire(ds_io_data);
 DallasTemperature sensors(&oneWire);
 /*------------------------------- T&RH SHT11 sensor --------------------------------*/
@@ -60,10 +62,13 @@ float sht_humi;
 const int sht_num = 3;
 #define sht_dataPin  2
 #define sht_clockPin 6
+static char shttempBuff[3];
+static char shthumiBuff[2];
 SHT1x sht1x(sht_dataPin, sht_clockPin);
 /*------------------------------- Rain sensor --------------------------------------*/
 int rainSensor_pin = A0;
 boolean rain_st = false;
+static char rainBuff[1];
 /*------------------------------- GSM - GPRS - MQTT --------------------------------*/
 String MQTT_HOST = "agriconnect.vn";
 String MQTT_PORT = "1883";
@@ -71,13 +76,14 @@ char* deviceName = "btnode01";
 char* mqttTopic = "bt01";
 char* mqttUser = "node";
 char* mqttPass = "654321";
+char* msgMQTT;
 String sosNum = "ATD988041419;";
 /*------------------------------- SOFT - UART --------------------------------------*/
 /* Software Serial through which mqtt events log is printed at 9600 baud rate */
 /* (RX, TX) */
 SoftwareSerial mySerial(8, 9);
 /*------------------------------- TIMER --------------------------------------------*/
-int timer_period = 5000;
+int timer_period = 10000;
 SimpleTimer timer1;
 
 void GSM_MQTT::AutoConnect(void)
@@ -183,7 +189,6 @@ void GSM_MQTT::OnMessage(char *Topic, int TopicLength, char *Message, int Messag
   mySerial.println(MessageLength);
   mySerial.println(Message);
 }
-
 GSM_MQTT MQTT(20);
 /* 20 is the keepalive duration in seconds */
 /*------------------------------- SETUP FUNC - RUN ONCE -----------------------------------*/
@@ -203,28 +208,21 @@ void setup()
 /*------------------------------- LOOP FUNC - LOOP FOREVER --------------------------------*/
 void loop()
 {
-  /* Run timer1 */
+  // Run timer1
   timer1.run();
-  /*
-     You can write your code here
-  */
 }
-void timer_isr() {
-  //char* json = "";
-  String json = buildJson();
-  int jsonLength = json.length();
-  char jsonStr[jsonLength];
-  json.toCharArray(jsonStr, jsonLength);
-  // Send JSON string to MQTT broker
-  if (MQTT.available())
-  {
-    // Send msg
-    MQTT.publish(0, 0, 0, 1, mqttTopic, "{\"aT\":\"123\",\"aRH\":\"12\"}");
-  }
-  MQTT.processing();
-}
+//void timer_isr() {
+//  if (MQTT.available()) {
+//    String json = buildJson();
+//    int jsonLength = json.length();
+//    char jsonStr[jsonLength];
+//    json.toCharArray(jsonStr, jsonLength);  
+//    // Send msg
+//    MQTT.publish(0, 0, 0, 1, mqttTopic, json.c_str());
+//  }
+//  MQTT.processing();
+//}
 /*------------------------------- TIMER_ISR --------------------------------------------*/
-/*
 void timer_isr() {
   // Soil SMC - T
   soilmoistureValue = (int)readSoilSensor(soilPin, soilNum, waterValue, airValue);
@@ -239,6 +237,13 @@ void timer_isr() {
   }
   // Check rain-status
   rain_st = checkRain(rainSensor_pin, 400);
+  // Convert all envi-paras into char[]
+  dtostrf((int)(soilmoistureValue * 10),3,0,soilmoistureBuff);
+  dtostrf((int)(ds_temp * 10),3,0,dstempBuff);
+  dtostrf((int)(sht_temp * 10),3,0,shttempBuff);
+  dtostrf((int)sht_humi,2,0,shthumiBuff);
+  dtostrf((int)rain_st,1,0,rainBuff);
+  sprintf(msgMQTT,"{\"sH\":%s,\"sT\":%s,\"aT\":%s,\"aH\":%s,\"aR\":%s}", soilmoistureBuff, dstempBuff, shttempBuff, shthumiBuff, rainBuff);
   // Send data by UART interface
   //  mySerial.print(soilmoistureValue); mySerial.print("%");
   //  mySerial.print("      "); mySerial.print(sht_temp, DEC); mySerial.print("oC");
@@ -246,21 +251,20 @@ void timer_isr() {
   //  mySerial.print("      "); mySerial.print(ds_temp); mySerial.print("oC");
   //  mySerial.print("      "); mySerial.print(rain_st, DEC);
   //  mySerial.println();
-  // Build JSON string
-  String json = buildJson();
-  //  mySerial.print("Json string: "); mySerial.print(json); 
-  char jsonStr[300];
-  json.toCharArray(jsonStr, 300);
   // Send JSON string to MQTT broker
   if (MQTT.available())
   {
+    // Build JSON string
+    //String json = buildJson();
+    //  mySerial.print("Json string: "); mySerial.print(json);
+    //char jsonStr[100];
+    //json.toCharArray(jsonStr, 100);
     // Send msg
-    MQTT.publish(0, 0, 0, 1, mqttTopic, jsonStr);
+    MQTT.publish(0, 0, 0, 1, mqttTopic, msgMQTT);
     delay(3000);
   }
   MQTT.processing();
 }
-*/
 /*------------------------------- SUB-FUNC_CAPACITOR SOIL MOISTURE SENSOR -------------*/
 float readSoilSensor(int analogPin, int num, int waterVal, int airVal) {
   int val = 0;
@@ -285,7 +289,6 @@ float readDs18b20(int index) {
   // request to the sensor
   sensors.requestTemperatures();
   temp = sensors.getTempCByIndex(index);
-  
   return temp;
 }
 /*------------------------------- SUB-FUNC_RAIN SENSOR --------------------------------*/
@@ -295,18 +298,18 @@ boolean checkRain(int pin, int refVal) {
   else return true;
 }
 /*------------------------------- SUB-FUNC_JSON STRING --------------------------------*/
-String buildJson() {
-  String data = "{";
-  data += "\"aT\":";
-  data += "30";
-  data += ",";
-  
-  data += "\"aRH\":";
-  data += "27";
-  data += "}";
-  
-  return data;
-}
+//String buildJson() {
+//  String data = "{";
+//  data += "\"aT\":";
+//  data += "30";
+//  data += ",";
+//  
+//  data += "\"aRH\":";
+//  data += "27";
+//  data += "}";
+//  
+//  return data;
+//}
 /*
 String buildJson() {
   String data = "{";
