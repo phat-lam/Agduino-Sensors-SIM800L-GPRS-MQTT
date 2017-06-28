@@ -131,7 +131,7 @@ void loop() {
   {
     // Send msg
     MQTT.publish(0, 0, 0, 1, mqttTopic, jsonStr);
-    delay(3000);
+    //delay(3000);
   }
   MQTT.processing();
   
