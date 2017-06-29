@@ -67,6 +67,8 @@ SHT1x sht1x(sht_dataPin, sht_clockPin);
 int rainSensor_pin = A0;
 boolean rain_st = false;
 static char rainBuff[2];
+/*------------------------------- NODE ---------------------------------------------*/
+char* nodeID = "01";
 /*------------------------------- SOFT - UART --------------------------------------*/
 // Software Serial through which mqtt events log is printed at 9600 baud rate
 // (RX, TX)
@@ -159,19 +161,24 @@ boolean checkRain(int pin, int refVal)
 String buildJson()
 {
   String data = "{";
-  data += "\"airT\": ";
+  data += "\"node\":";
+  data += "\"";
+  data += nodeID;
+  data += "\"";
+  data += ",";
+  data += "\"aT\":";
   data += shttempBuff;
   data += ",";
-  data += "\"airRH\": ";
+  data += "\"aRH\":";
   data += shthumiBuff;
   data += ",";
-  data += "\"airR\": ";
+  data += "\"aR\":";
   data += rainBuff;
   data += ",";
-  data += "\"soilMC\": ";
+  data += "\"sMC\":";
   data += soilmoistureBuff;
   data += ",";
-  data += "\"soilT\": ";
+  data += "\"sT\":";
   data += dstempBuff;
   data += "}";
   return data;
